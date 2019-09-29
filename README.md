@@ -9,7 +9,7 @@ Useful scripts for use as an edge RouterOS device
 
 ## Cloudflare-DDNS
 
-1. Install python-cloudflare
+1. Install [python-cloudflare](https://github.com/cloudflare/python-cloudflare)
 
 ```$ sudo apt install python-pip && sudo pip install cloudflare```
 
