@@ -1,0 +1,56 @@
+################# CloudFlare variables #################
+# Enter interface to get public IP to watch
+:global WANInterface "WAN";
+
+# Enter email and global API key below
+:local CFemail "emailaddress";
+:local CFtkn "globalAPIkey";
+
+# Enter Zone ID below, you can use the Cloudflare API guide
+# RECOMMENDED: Use the included cloudflare-api.py to get your domain IDs
+# Can also be found on the main domain page under "API: Zone ID" on the right column in the Cloudfalre Dashboard
+:local CFrecordType "A";
+:local CFzoneid "domainZoneID";
+
+# An associative array of domain names to domainIds (32 chars each, you'll need to query CF to get them)
+# Use the included cloudflare-api.py to get your IDs
+# Keep formatting consistent (quotes and semi-colons. Make sure to end a line preceeding a new one with a \
+:local CFdomains { "domain.com"="recordID"; \ 
+				   "sub.domain.com"="recordID"; \ 
+				   "sub2.domain.com"="recordID" };
+# An associative array of domain names to whether you want to enable CF proxying or not
+:local CFproxied { "domain.com"="true"; \
+				   "sub.domain.com"="true"; \ 
+				   "sub2.domain.com"="false"; \
+# You'll need to have at least one domain that's proxied=false, otherwise resolve will keep getting CF's proxy IP instead of yours
+:local CFunproxiedDomain "sub2.domain.com";
+
+#########################################################################
+########################  DO NOT EDIT BELOW  ############################
+#########################################################################
+
+################# Internal variables #################
+:local resolvedIP "";
+:global WANip "";
+ 
+################# Resolve and set IP-variables #################
+:local currentIP [/ip address get [/ip address find interface=$WANInterface ] address];
+:set WANip [:pick $currentIP 0 [:find $currentIP "/"]];
+:set resolvedIP [:resolve $CFunproxiedDomain];
+ 
+######## Compare and update CF if necessary #####
+:if ($resolvedIP != $WANip) do={
+  :log info "cloudflare: $CFunproxiedDomain $resolvedIP => $WANip";
+  :foreach domainName,domainId in=$CFdomains do={
+    :local proxied ($CFproxied->$domainName);
+    :local url "https://api.cloudflare.com/client/v4/zones/$CFzoneid/dns_records/$domainId";
+    :local header "X-Auth-Email:$CFemail,X-Auth-Key:$CFtkn,content-type:application/json";
+    :local data "{\"type\":\"$CFrecordType\",\"name\":\"$domainName\",\"content\":\"$WANip\",\"proxied\":$proxied}";
+    :local result [/tool fetch http-method=put mode=https url=$url http-header-field=$header http-data=$data];
+    :if ([len $result] > 1) do={
+    :log info "Updated $domainName";
+    }
+  };
+} else={
+  :log info "cloudflare: no update needed"
+};

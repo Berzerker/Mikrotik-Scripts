@@ -1,0 +1,9 @@
+# WOL Script to start device remotely via magic packet
+
+# Enter Interface device is connected to
+:local inter "int";
+
+# Enter MAC Address of NIC responding to magic packet
+:local addr "AA:BB:CC:DD:EE:FF";
+
+/tool wol interface=$inter mac=$addr
