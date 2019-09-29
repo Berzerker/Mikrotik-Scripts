@@ -11,7 +11,7 @@ Useful scripts for use as an edge RouterOS device
 
 1. Install python-cloudflare
 
-`$ sudo apt install python-pip && sudo pip install cloudflare`
+```$ sudo apt install python-pip && sudo pip install cloudflare```
 
 2. Edit the cloudflare-api.py to enter your domain you want to find the IDs for, your email, and global API key
 
@@ -19,7 +19,7 @@ Useful scripts for use as an edge RouterOS device
 
 4. Edit the RouterOS script according to your domains and specifications
 
-`$ python cloudflare-api.py`
+```$ python cloudflare-api.py```
 
 RouterOS Config Requirements:
 ```
