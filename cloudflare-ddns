@@ -21,7 +21,7 @@
 # An associative array of domain names to whether you want to enable CF proxying or not
 :local CFproxied { "domain.com"="true"; \
 				   "sub.domain.com"="true"; \ 
-				   "sub2.domain.com"="false"; \
+				   "sub2.domain.com"="false" };
 # You'll need to have at least one domain that's proxied=false, otherwise resolve will keep getting CF's proxy IP instead of yours
 :local CFunproxiedDomain "sub2.domain.com";
 
