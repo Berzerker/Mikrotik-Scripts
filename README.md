@@ -9,6 +9,8 @@ Useful scripts for use as an edge RouterOS device
 
 ## Cloudflare-DDNS
 
+Depends on [Mikrotik JSON Parser](https://github.com/Winand/mikrotik-json-parser) *(if repo is unavailable, please open an issue and I'll provide the script)
+
 1. Install [python-cloudflare](https://github.com/cloudflare/python-cloudflare)
 
 ```$ sudo apt install python-pip && sudo pip install cloudflare```

@@ -1,4 +1,13 @@
-################# CloudFlare variables #################
+# This is a Dynamic DNS script to read and update cloudflare entries via API based on IPs from this device
+# This script does the following:
+# 1. Calls Cloudlfare API for the current domain of the one specified in the variables below
+# 2. Iterates over the two arrays to properly send updates via API to update cloudflare entries if
+#     the current IP is different than the pulled IP in step 1.
+# 
+# This script depends on the JSON Parser from https://github.com/Winand/mikrotik-json-parser
+#
+
+######################## Edit the following variables with your information#############
 # Enter interface to get public IP to watch
 :global WANInterface "WAN";
 
@@ -14,43 +23,64 @@
 
 # An associative array of domain names to domainIds (32 chars each, you'll need to query CF to get them)
 # Use the included cloudflare-api.py to get your IDs
-# Keep formatting consistent (quotes and semi-colons. Make sure to end a line preceeding a new one with a \
+# Keep formatting consistent (quotes and semi-colons. Make sure to end a line preceding a new one with a \
 :local CFdomains { "domain.com"="recordID"; \ 
 				   "sub.domain.com"="recordID"; \ 
 				   "sub2.domain.com"="recordID" };
+				   
 # An associative array of domain names to whether you want to enable CF proxying or not
 :local CFproxied { "domain.com"="true"; \
 				   "sub.domain.com"="true"; \ 
 				   "sub2.domain.com"="false" };
-# You'll need to have at least one domain that's proxied=false, otherwise resolve will keep getting CF's proxy IP instead of yours
-:local CFunproxiedDomain "sub2.domain.com";
+				   
+# Define the variable below with one of your domains and domain record IDs from CFdomains above
+:local domainCheck "domain.com";
+:local domainIdCheck "recordID";
+
 
 #########################################################################
-########################  DO NOT EDIT BELOW  ############################
+########################  DO NOT EDIT BELOW  ################################
 #########################################################################
 
-################# Internal variables #################
-:local resolvedIP "";
-:global WANip "";
- 
-################# Resolve and set IP-variables #################
+######################## Load in JSON Parser #################################
+/system/script run JParseFunctions
+:global JSONLoad;
+:global JSONLoads;
+:global JSONUnload;
+:global JSONIn;
+
+######################## Get Current IP and set IP variables ########################
 :local currentIP [/ip address get [/ip address find interface=$WANInterface ] address];
-:set WANip [:pick $currentIP 0 [:find $currentIP "/"]];
-:set resolvedIP [:resolve $CFunproxiedDomain];
- 
-######## Compare and update CF if necessary #####
-:if ($resolvedIP != $WANip) do={
-  :log info "cloudflare: $CFunproxiedDomain $resolvedIP => $WANip";
+:local WANip [:pick $currentIP 0 [:find $currentIP "/"]];
+
+######################## Get current record from CloudFlare via API call ###############
+:local checkURL "https://api.cloudflare.com/client/v4/zones/$CFzoneid/dns_records/$domainIdCheck";
+:local checkHeader "X-Auth-Email:$CFemail,X-Auth-Key:$CFtkn,content-type:application/json";
+/tool fetch dst-path=cf-check.txt http-method=get mode=https url=$checkURL http-header-field=$checkHeader http-data=$data
+:local checkedIP ([$JSONLoad "cf-check.txt"]->"result"->"content")
+
+:log info "cloudflare: checked IP: $checkedIP, WAN IP: $WANip"
+
+####################### Compare and update Cloudflare if necessary #################
+:if (($checkedIP != $WANip) and ([len $domainIdCheck] > 1)) do={
+  :log info "cloudflare: Checked IP is different from WAN IP, updating";
   :foreach domainName,domainId in=$CFdomains do={
     :local proxied ($CFproxied->$domainName);
     :local url "https://api.cloudflare.com/client/v4/zones/$CFzoneid/dns_records/$domainId";
     :local header "X-Auth-Email:$CFemail,X-Auth-Key:$CFtkn,content-type:application/json";
-    :local data "{\"type\":\"$CFrecordType\",\"name\":\"$domainName\",\"content\":\"$WANip\",\"proxied\":$proxied}";
-    :local result [/tool fetch http-method=put mode=https url=$url http-header-field=$header http-data=$data];
-    :if ([len $result] > 1) do={
+    :local data "{\"type\":\"$CFrecordType\",\"name\":\"$domainName\",\"content\":\"$WANip\",\"ttl\":\"1\",\"proxied\":$proxied}";
+    :local result [/tool fetch output=user http-method=put mode=https url=$url http-header-field=$header http-data=$data];  
+    :if ([len $data] > 1) do={
     :log info "Updated $domainName";
     }
   };
+  :log info "cloudflare: update complete"
 } else={
   :log info "cloudflare: no update needed"
 };
+
+# unload JSON Parser
+$JSONUnload
+
+# delete cf-check.txt
+/file/remove cf-check.txt
